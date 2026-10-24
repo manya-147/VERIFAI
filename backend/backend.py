@@ -8,14 +8,17 @@ Examples:
 
 import argparse
 import asyncio
+from collections.abc import Callable
 
-from tinyfish import TinyFish
+from tinyfish import RunStatus, TinyFish
 
 try:  # Support both `python backend/backend.py` and `python -m backend.backend`.
     from .models import (
         INTERNSHIP_GOAL,
         INTERNSHIP_SCHEMA,
         PAGES,
+        build_schema,
+        extract_items,
         require_api_key,
         save,
         scrape,
@@ -26,11 +29,61 @@ except ImportError:
         INTERNSHIP_GOAL,
         INTERNSHIP_SCHEMA,
         PAGES,
+        build_schema,
+        extract_items,
         require_api_key,
         save,
         scrape,
         scrape_one,
     )
+
+
+def collect_from_pages(
+    pages: dict[str, str],
+    goal: str = INTERNSHIP_GOAL,
+    limit: int = 10,
+    on_progress: Callable[[str], None] | None = None,
+) -> list[dict]:
+    """Stream over supplied pages until the requested number of listings is reached."""
+    if not pages or limit <= 0:
+        return []
+
+    client = TinyFish()
+    listings: list[dict] = []
+    for source, url in pages.items():
+        remaining = limit - len(listings)
+        if remaining <= 0:
+            break
+        if on_progress:
+            on_progress(f"Searching {url}")
+
+        result = None
+        try:
+            with client.agent.stream(
+                url=url,
+                goal=goal,
+                output_schema=build_schema(collection_key="listings", max_items=remaining),
+            ) as events:
+                for event in events:
+                    event_type = getattr(event.type, "value", event.type)
+                    if event_type == "PROGRESS" and on_progress:
+                        on_progress(f"{url}: {event.purpose}")
+                    elif event_type == "COMPLETE":
+                        if event.status == RunStatus.COMPLETED:
+                            result = event.result_json
+                        elif on_progress:
+                            on_progress(f"Could not collect results from {url}: {event.status}")
+        except Exception as error:
+            if on_progress:
+                on_progress(f"Could not collect results from {url}: {error}")
+            continue
+
+        items = extract_items(result, "listings")
+        listings.extend(
+            {"source": source, **item}
+            for item in items
+        )
+    return listings[:limit]
 
 
 def parse_args() -> argparse.Namespace:
@@ -64,10 +117,7 @@ def main() -> None:
         pages = PAGES
     else:
         search_results = TinyFish().search.query(query=args.query)
-        pages = {
-            result.url: result.url
-            for result in search_results.results[: max(args.limit, 0)]
-        }
+        pages = {result.url: result.url for result in search_results.results[: max(args.limit, 0)]}
         if not pages:
             print("No pages found for that search.")
             save([], args.output)

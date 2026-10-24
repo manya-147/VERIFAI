@@ -3,13 +3,15 @@
 import asyncio
 import json
 import os
-from dotenv import load_dotenv
 import sys
 from dataclasses import dataclass, field
 from typing import Any
 
+from dotenv import load_dotenv
 from tinyfish import AsyncTinyFish, RunStatus
-load_dotenv() 
+
+load_dotenv()
+
 
 @dataclass
 class Listing:
@@ -40,13 +42,14 @@ class Listing:
 DEFAULT_GOAL = (
     "Find current opportunities relevant to the requested audience and category. "
     "For each one return its title, organization, location, whether it is remote, "
-    "deadline, application or information link, and category."
+    "deadline, application or information link, and category. Use an empty string "
+    "for unavailable text fields and null when the remote status is unknown."
 )
 DEFAULT_FIELDS: dict[str, dict[str, str]] = {
     "title": {"type": "string"},
     "organization": {"type": "string"},
     "location": {"type": "string"},
-    "remote": {"type": "boolean"},
+    "remote": {"type": "boolean", "nullable": True},
     "deadline": {"type": "string"},
     "apply_link": {"type": "string"},
     "category": {"type": "string"},
@@ -56,22 +59,38 @@ DEFAULT_FIELDS: dict[str, dict[str, str]] = {
 def build_schema(
     fields: dict[str, dict[str, str]] | None = None,
     collection_key: str = "listings",
+    max_items: int | None = None,
 ) -> dict[str, Any]:
-    """Build a TinyFish JSON schema for a collection of listing records."""
+    """Build a TinyFish-supported schema for a collection of listing records."""
+    item_fields = DEFAULT_FIELDS if fields is None else fields
+    item_schema: dict[str, Any] = {
+        "type": "object",
+        "properties": item_fields,
+        "required": list(item_fields),
+    }
+    array_schema: dict[str, Any] = {"type": "array", "items": item_schema}
+    if max_items is not None:
+        array_schema["maxItems"] = max_items
     return {
         "type": "object",
-        "properties": {
-            collection_key: {
-                "type": "array",
-                "items": {"type": "object", "properties": fields or DEFAULT_FIELDS},
-            }
-        },
+        "properties": {collection_key: array_schema},
+        "required": [collection_key],
     }
 
 
 def require_api_key() -> None:
     if not os.getenv("TINYFISH_API_KEY"):
         sys.exit("Set TINYFISH_API_KEY first (see the setup guide).")
+
+
+def extract_items(result: Any, collection_key: str = "listings") -> list[dict[str, Any]]:
+    """Read structured collection data from either documented result shape."""
+    if not isinstance(result, dict):
+        return []
+    items = result.get(collection_key)
+    if not isinstance(items, list) and isinstance(result.get("result"), dict):
+        items = result["result"].get(collection_key)
+    return [item for item in items if isinstance(item, dict)] if isinstance(items, list) else []
 
 
 def scrape_one(url: str, goal: str = DEFAULT_GOAL) -> Any:
@@ -90,10 +109,42 @@ async def scrape(
     goal: str = DEFAULT_GOAL,
     collection_key: str = "listings",
     schema: dict[str, Any] | None = None,
+    max_listings: int | None = None,
 ) -> list[dict[str, Any]]:
-    """Scrape multiple named sources concurrently and attach each source name."""
+    """Scrape sources and attach each source name to its returned listings.
+
+    When ``max_listings`` is provided, sources are visited in order and scraping
+    stops once that many records have been collected.
+    """
     agents = AsyncTinyFish()
     output_schema = schema or build_schema(collection_key=collection_key)
+
+    if max_listings is not None:
+        if max_listings <= 0:
+            return []
+        listings: list[dict[str, Any]] = []
+        for source, url in pages.items():
+            try:
+                page_schema = schema or build_schema(
+                    collection_key=collection_key,
+                    max_items=max_listings - len(listings),
+                )
+                run = await agents.agent.run(url=url, goal=goal, output_schema=page_schema)
+            except Exception as error:
+                print(f"! {source}: no result ({error})")
+                continue
+            if run.status != RunStatus.COMPLETED:
+                print(f"! {source}: no result ({run.status})")
+                continue
+            items = extract_items(run.result, collection_key)
+            listings.extend(
+                {"source": source, **item}
+                for item in items
+            )
+            if len(listings) >= max_listings:
+                return listings[:max_listings]
+        return listings
+
     runs = await asyncio.gather(
         *(agents.agent.run(url=url, goal=goal, output_schema=output_schema) for url in pages.values()),
         return_exceptions=True,
@@ -105,9 +156,8 @@ async def scrape(
             status = run if isinstance(run, Exception) else run.status
             print(f"! {source}: no result ({status})")
             continue
-        result = run.result
-        items = result.get(collection_key, []) if isinstance(result, dict) else []
-        listings.extend({"source": source, **item} for item in items if isinstance(item, dict))
+        items = extract_items(run.result, collection_key)
+        listings.extend({"source": source, **item} for item in items)
     return listings
 
 
