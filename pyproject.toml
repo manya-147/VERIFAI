@@ -2,4 +2,7 @@
 name = "hackton"
 version = "0.1.0"
 requires-python = ">=3.13"
-dependencies = []
+dependencies = [
+    "python-dotenv>=1.2.4",
+    "tinyfish>=0.11.0",
+]

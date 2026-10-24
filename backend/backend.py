@@ -16,7 +16,6 @@ try:  # Support both `python backend/backend.py` and `python -m backend.backend`
         INTERNSHIP_GOAL,
         INTERNSHIP_SCHEMA,
         PAGES,
-        build_schema,
         require_api_key,
         save,
         scrape,
@@ -27,35 +26,10 @@ except ImportError:
         INTERNSHIP_GOAL,
         INTERNSHIP_SCHEMA,
         PAGES,
-        build_schema,
         require_api_key,
         save,
         scrape,
         scrape_one,
-    )
-
-
-def discover_pages(query: str, limit: int = 5) -> dict[str, str]:
-    """Use TinyFish search to discover target pages for a user query."""
-    search_results = TinyFish().search.query(query=query)
-    return {
-        result.url: result.url
-        for result in search_results.results[: max(limit, 0)]
-        if getattr(result, "url", None)
-    }
-
-
-def collect_from_pages(pages: dict[str, str], goal: str = INTERNSHIP_GOAL) -> list[dict]:
-    """Scrape discovered target pages and return their listing records."""
-    if not pages:
-        return []
-    return asyncio.run(
-        scrape(
-            pages,
-            goal=goal,
-            collection_key="listings",
-            schema=build_schema(collection_key="listings"),
-        )
     )
 
 
@@ -90,7 +64,10 @@ def main() -> None:
         pages = PAGES
     else:
         search_results = TinyFish().search.query(query=args.query)
-        pages = {result.url: result.url for result in search_results.results[: max(args.limit, 0)]}
+        pages = {
+            result.url: result.url
+            for result in search_results.results[: max(args.limit, 0)]
+        }
         if not pages:
             print("No pages found for that search.")
             save([], args.output)
