@@ -26,6 +26,7 @@ except ImportError:
 import asyncio
 import contextlib
 import io
+from concurrent.futures import ThreadPoolExecutor, wait as futures_wait
 
 from fastapi import FastAPI
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
@@ -102,12 +103,14 @@ def _remote_first(listings: list[dict]) -> list[dict]:
 
 
 # Per-page limits (the SDK default is 10 min x 3 attempts per page, which can look like an endless "Working…").
-PAGE_TIMEOUT = 120      # seconds allowed for one page's TinyFish run
-RUN_TIMEOUT = 300       # seconds after which slow pages are skipped and the rest is returned
-CONCURRENCY = 4         # pages scraped at the same time
+# Real TinyFish browser runs often take 1-4 minutes, so 120s skipped almost every page.
+# Override without editing code:  PAGE_TIMEOUT=300 RUN_TIMEOUT=450 CONCURRENCY=5 python frontend/server.py
+PAGE_TIMEOUT = int(os.getenv("PAGE_TIMEOUT", "240"))   # seconds allowed for one page's TinyFish run
+RUN_TIMEOUT = int(os.getenv("RUN_TIMEOUT", "420"))     # then slow pages are skipped and the rest is returned (keep < 8 min, the browser cutoff in runner.js)
+CONCURRENCY = int(os.getenv("CONCURRENCY", "5"))       # pages scraped at the same time (5 = the default search limit, so one wave)
 
 
-async def _scrape_timed(pages: dict[str, str], goal: str, collection: str, schema: dict | None, progress) -> list[dict]:
+async def _scrape_timed(pages: dict[str, str], goal: str, collection: str, schema: dict | None, progress, on_partial=None) -> list[dict]:
     """Same job as backend.models.scrape(), but with time limits and live per-page progress."""
     client = AsyncTinyFish(timeout=PAGE_TIMEOUT, max_retries=0)
     output_schema = schema or build_schema(collection_key=collection)
@@ -134,8 +137,11 @@ async def _scrape_timed(pages: dict[str, str], goal: str, collection: str, schem
                 progress(f"[{finished}/{total}] Skipped {source} — run ended as {run.status}")
                 return
             items = extract_items(run.result, collection)
-            listings.extend({"source": source, **item} for item in items)
+            batch = [{"source": source, **item} for item in items]
+            listings.extend(batch)
             progress(f"[{finished}/{total}] {source} — {len(items)} found")
+            if batch and on_partial:
+                on_partial(batch)   # lets the UI keep these even if a later page is too slow
 
     tasks = [asyncio.create_task(one(name, url)) for name, url in pages.items()]
     _, pending = await asyncio.wait(tasks, timeout=RUN_TIMEOUT)
@@ -145,6 +151,35 @@ async def _scrape_timed(pages: dict[str, str], goal: str, collection: str, schem
             task.cancel()
         await asyncio.gather(*pending, return_exceptions=True)
     return listings
+
+
+def _collect_parallel(links: list[str], goal: str, limit: int, progress, on_partial) -> list[dict]:
+    """backend.collect_from_pages() is sequential, so run it once per link, in parallel.
+
+    The backend function itself is untouched; this only changes how server.py calls it.
+    """
+    results: list[dict] = []
+    lock = threading.Lock()
+
+    def one(url: str) -> None:
+        try:
+            rows = collect_from_pages({url: url}, goal, limit, on_progress=progress)
+        except Exception as error:  # noqa: BLE001
+            progress(f"Could not collect results from {url}: {error}")
+            return
+        with lock:
+            results.extend(rows)
+        if rows:
+            on_partial(rows)
+
+    pool = ThreadPoolExecutor(max_workers=max(1, min(len(links), CONCURRENCY)))
+    futures = [pool.submit(one, url) for url in links]
+    _, pending = futures_wait(futures, timeout=RUN_TIMEOUT)
+    if pending:
+        progress(f"Stopped waiting for {len(pending)} slow page(s) after {RUN_TIMEOUT}s — showing what was found.")
+    pool.shutdown(wait=False, cancel_futures=True)
+    with lock:
+        return results[:limit]
 
 
 # ───────── Find & scrape: general-purpose search (products, jobs, events, anything) ─────────
@@ -327,11 +362,12 @@ def run(req: RunRequest):
 
     events: queue.Queue = queue.Queue()
     progress = lambda message: events.put({"type": "progress", "message": str(message)})  # noqa: E731
+    partial = lambda batch: events.put({"type": "partial", "listings": batch})  # noqa: E731
 
     def scrape_pages(pages: dict[str, str]) -> list[dict]:
         events.put({"type": "pages", "pages": list(pages.values())})
         return _remote_first(asyncio.run(_scrape_timed(
-            pages, goal, collection, INTERNSHIP_SCHEMA if collection == "internships" else None, progress,
+            pages, goal, collection, INTERNSHIP_SCHEMA if collection == "internships" else None, progress, partial,
         )))
 
     def worker():
@@ -341,7 +377,7 @@ def run(req: RunRequest):
             with _run_lock, contextlib.redirect_stdout(_LineWriter(progress)):
                 if mode == "links":        # backend.collect_from_pages
                     events.put({"type": "pages", "pages": links})
-                    listings = collect_from_pages({u: u for u in links}, goal, limit, on_progress=progress)
+                    listings = _collect_parallel(links, goal, limit, progress, partial)
                     events.put({"type": "result", "listings": listings})
                 elif mode == "single":     # backend mode 1: scrape_one
                     events.put({"type": "pages", "pages": [url]})
@@ -362,7 +398,7 @@ def run(req: RunRequest):
                         progress(f"Found {len(pages)} pages. Scraping up to {CONCURRENCY} at a time (max {PAGE_TIMEOUT}s each)…")
                         events.put({"type": "pages", "pages": list(pages.values())})
                         rows = asyncio.run(_scrape_timed(
-                            pages, plan["goal"], plan["collection"], plan["schema"], progress,
+                            pages, plan["goal"], plan["collection"], plan["schema"], progress, partial,
                         ))
                         rows = plan["finish"](rows)
                         events.put({"type": "result", "listings": rows, "note": plan["note"]})

@@ -26,7 +26,7 @@ function log(msg) {
   $("progressLog").appendChild(li);
 }
 
-async function run(payload, onProgress, onPages, signal) {
+async function run(payload, onProgress, onPages, signal, onPartial) {
   const res = await fetch("/api/run", {
     method: "POST",
     signal,
@@ -47,6 +47,7 @@ async function run(payload, onProgress, onPages, signal) {
     const msg = JSON.parse(line);
     if (msg.type === "progress") onProgress(msg.message);
     else if (msg.type === "pages") onPages(msg.pages);
+    else if (msg.type === "partial") onPartial && onPartial(msg.listings || []);
     else if (msg.type === "result") result = msg;
     else if (msg.type === "error") throw new Error(msg.message);
   };
@@ -107,6 +108,7 @@ $("searchForm").addEventListener("submit", async (e) => {
   if (MODE === "links") log(`Visiting up to ${payload.links.length} links until ${payload.limit} listings are collected.`);
 
   let pages = [];
+  const partial = [];   // listings that arrived before the final result
   // Live timer, and a hard stop so the page can never look stuck forever (server limits are ~5 min).
   const startedAt = Date.now();
   const ticker = setInterval(() => {
@@ -116,7 +118,10 @@ $("searchForm").addEventListener("submit", async (e) => {
   const controller = new AbortController();
   const cutoff = setTimeout(() => controller.abort(), 8 * 60 * 1000);
   try {
-    const result = await run(payload, log, (p) => { pages = p; }, controller.signal);
+    const result = await run(payload, log, (p) => { pages = p; }, controller.signal, (batch) => {
+      partial.push(...batch);
+      log(`${partial.length} result${partial.length === 1 ? "" : "s"} collected so far`);
+    });
 
     store.mode = MODE;
     store.pages = pages;
@@ -143,6 +148,23 @@ $("searchForm").addEventListener("submit", async (e) => {
     $("viewResults").hidden = false;
     setTimeout(() => { location.href = "results.html"; }, 900);
   } catch (err) {
+    if (MODE !== "single" && partial.length) {
+      // Something was cut off (timeout, dropped connection) but we already have results: keep them.
+      store.mode = MODE;
+      store.pages = pages;
+      store.limit = payload.limit;
+      store.form[PAGE] = Object.fromEntries(FIELDS.map((id) => [id, $(id).value]));
+      store.raw = undefined;
+      store.results = partial.slice(0, payload.limit);
+      store.note = "Partial results: the run was cut off before every page finished.";
+      record(`${WHAT[MODE]} partial — ${store.results.length} listings`, { ok: true, listings: store.results.length, links: pages.length });
+      saveStore();
+      $("progressCard").classList.add("done");
+      $("progressTitle").textContent = "Partial results";
+      $("viewResults").hidden = false;
+      setTimeout(() => { location.href = "results.html"; }, 900);
+      return;
+    }
     $("progressCard").hidden = true;
     const msg = err.name === "AbortError" ? "It took longer than 8 minutes, so it was stopped. Try fewer pages or a more specific search." : err.message;
     showError(`Could not complete the search: ${msg}`);

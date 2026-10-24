@@ -11,7 +11,8 @@ import asyncio
 from collections.abc import Callable
 
 from tinyfish import RunStatus, TinyFish
-
+from dotenv import load_dotenv
+load_dotenv()
 try:  # Support both `python backend/backend.py` and `python -m backend.backend`.
     from .models import (
         INTERNSHIP_GOAL,
