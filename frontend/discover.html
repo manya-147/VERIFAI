@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Find & Scrape · Opportunity Finder</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body data-page="discover">
+  <div class="app">
+    <aside class="sidebar" id="sidebar"></aside>
+
+    <main class="main">
+      <button class="menu-btn" id="menuBtn" aria-label="Toggle menu">☰</button>
+
+      <section class="panel hero-panel compact">
+        <div>
+          <h1>Find &amp; scrape 🌍</h1>
+          <p class="hero-text">Search the web for anything — product prices, jobs, events, or any topic — then scrape the top pages and collect the results in one table.</p>
+        </div>
+        <span class="pill" id="statusPill">Ready</span>
+      </section>
+
+      <form id="searchForm" class="panel form" novalidate>
+        <div class="field">
+          <label for="query">What are you looking for?</label>
+          <input id="query" type="text" placeholder="e.g. cheapest iPhone 17, running shoes under 3000, laptop bags, AI hackathons" />
+        </div>
+        <div class="form-row two">
+          <div class="field">
+            <label for="category">Type of search</label>
+            <select id="category">
+              <option value="auto" selected>Auto-detect</option>
+              <option value="shopping">Shopping &amp; prices</option>
+              <option value="jobs">Jobs &amp; internships</option>
+              <option value="events">Events</option>
+              <option value="general">Anything else</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="region">Country / city <small>optional</small></label>
+            <input id="region" type="text" placeholder="e.g. India, Delhi, USA" />
+          </div>
+        </div>
+        <div class="field">
+          <label for="goal">Extra instructions <small>optional — leave empty for the default for this type</small></label>
+          <textarea id="goal" rows="2" placeholder="e.g. only 256GB, only brand-new, only from official stores"></textarea>
+        </div>
+        <div class="form-row">
+          <div class="field">
+            <label for="limit">Number of web pages to scrape</label>
+            <div class="stepper">
+              <button type="button" id="minus" aria-label="Decrease">−</button>
+              <input id="limit" type="number" min="1" max="100" value="10" />
+              <button type="button" id="plus" aria-label="Increase">+</button>
+            </div>
+          </div>
+          <button id="submitBtn" type="submit" class="btn btn-teal btn-lg">
+            <span class="spinner" hidden></span>
+            <span class="label">Search &amp; scrape</span>
+          </button>
+        </div>
+        <div id="error" class="alert error" hidden></div>
+      </form>
+
+      <section id="progressCard" class="panel progress" hidden>
+        <h3><span class="dot"></span><span id="progressTitle">Working…</span></h3>
+        <ul id="progressLog"></ul>
+        <a href="results.html" class="btn btn-teal view-results" id="viewResults" hidden>View results →</a>
+      </section>
+
+      <footer>Built with TinyFish · Opportunity Finder</footer>
+    </main>
+  </div>
+  <script src="shared.js"></script>
+  <script src="runner.js"></script>
+</body>
+</html>

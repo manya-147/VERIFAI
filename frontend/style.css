@@ -189,3 +189,35 @@ footer { text-align: center; color: var(--muted); font-size: .78rem; margin-top:
   .status-meta { width: 100%; justify-content: space-between; }
   .results-tools input { width: 100%; }
 }
+
+/* ── Multi-page additions ── */
+.hero-panel.compact { padding: 26px 30px; align-items: center; }
+.hero-panel.compact h1 { font-size: clamp(1.5rem, 3vw, 2rem); }
+.hero-panel.compact .hero-text { margin-top: 6px; }
+.more-link { display: inline-block; margin-top: 16px; color: var(--teal-dark); font-weight: 600; font-size: .88rem; text-decoration: none; }
+.more-link:hover { text-decoration: underline; }
+.activity li.fail::before { background: #e05d5d; }
+.view-results { margin-top: 18px; }
+.empty-state { text-align: center; padding: 48px 30px; display: grid; justify-items: center; gap: 8px; }
+.empty-state p { color: var(--muted); margin-bottom: 10px; }
+.empty-ico { font-size: 42px; }
+.nav-item { text-decoration: none; }
+
+/* ── Backend-mode pages ── */
+a.preset { text-decoration: none; }
+input[type="text"] {
+  width: 100%; background: #fff; border: 1px solid #dfe3e8; color: var(--text); border-radius: 12px;
+  padding: 12px 14px; font: inherit; font-size: .92rem; transition: .18s;
+}
+input[type="text"]:focus { outline: none; border-color: var(--teal); box-shadow: 0 0 0 4px rgba(42,143,124,.15); }
+.json { background: #0f1b2d; color: #d6e4f5; padding: 18px; border-radius: 14px; overflow: auto; max-height: 60vh; font: .82rem/1.55 ui-monospace, Menlo, Consolas, monospace; white-space: pre-wrap; word-break: break-word; }
+.status-tag { display: inline-block; margin-bottom: 12px; }
+
+/* ── Find & scrape: category select + two-column row ── */
+select {
+  width: 100%; background: #fff; border: 1px solid #dfe3e8; color: var(--text); border-radius: 12px;
+  padding: 12px 14px; font: inherit; font-size: .92rem; transition: .18s; cursor: pointer;
+}
+select:focus { outline: none; border-color: var(--teal); box-shadow: 0 0 0 4px rgba(42,143,124,.15); }
+.form-row.two { align-items: flex-start; gap: 16px; margin-bottom: 0; }
+.form-row.two .field { flex: 1 1 220px; margin-bottom: 20px; }
