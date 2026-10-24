@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Opportunity Finder</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app">
+    <!-- ───────── Sidebar ───────── -->
+    <aside class="sidebar" id="sidebar">
+      <div class="brand">
+        <div class="brand-logo">🔎</div>
+        <div>
+          <div class="brand-name">Opportunity Finder</div>
+          <div class="brand-sub">powered by TinyFish</div>
+        </div>
+      </div>
+
+      <nav class="nav">
+        <div class="nav-group">Overview</div>
+        <a href="#top" class="nav-item active" data-target="top"><span>🏠</span>Dashboard</a>
+
+        <div class="nav-group">Discover</div>
+        <a href="#presets" class="nav-item" data-target="presets"><span>✨</span>Quick Presets</a>
+        <a href="#search" class="nav-item" data-target="search"><span>🔗</span>Search Links</a>
+
+        <div class="nav-group">Output</div>
+        <a href="#results" class="nav-item" data-target="results"><span>📋</span>Results</a>
+        <a href="#activity" class="nav-item" data-target="activity"><span>⚡</span>Recent Activity</a>
+      </nav>
+
+      <div class="sidebar-foot">
+        <button class="nav-item btn-reset" id="clearHistory" type="button"><span>🧹</span>Clear history</button>
+      </div>
+    </aside>
+
+    <!-- ───────── Main ───────── -->
+    <main class="main" id="top">
+      <button class="menu-btn" id="menuBtn" aria-label="Toggle menu">☰</button>
+
+      <section class="panel hero-panel">
+        <div>
+          <h1>Welcome back 👋</h1>
+          <p class="hero-sub">OPPORTUNITY FINDER — a TinyFish-powered scraper</p>
+          <p class="hero-text">Provide the pages to search and the maximum number of listings to collect.
+            TinyFish visits the links in order and stops once it reaches your limit.</p>
+        </div>
+        <a href="#search" class="btn btn-teal">+ New Search</a>
+      </section>
+
+      <section class="panel status-strip">
+        <div class="status-icon">💎</div>
+        <div class="status-main">
+          <div class="eyebrow">Engine status</div>
+          <div class="status-title">TinyFish Scraper — <span id="statusText">Ready</span></div>
+        </div>
+        <div class="status-meta">
+          <div><strong id="metaLimit">10</strong><span>Max listings</span></div>
+          <div><strong id="metaLinks">0</strong><span>Links queued</span></div>
+          <span class="pill" id="statusPill">Ready</span>
+        </div>
+      </section>
+
+      <section class="stats">
+        <div class="stat"><div class="stat-ico">🔍</div><div class="stat-num" id="statSearches">0</div><div class="stat-label">Searches run</div></div>
+        <div class="stat"><div class="stat-ico">📌</div><div class="stat-num" id="statListings">0</div><div class="stat-label">Listings collected</div></div>
+        <div class="stat"><div class="stat-ico">🌐</div><div class="stat-num" id="statLinks">0</div><div class="stat-label">Links visited</div></div>
+        <div class="stat"><div class="stat-ico">✅</div><div class="stat-num" id="statRate">—</div><div class="stat-label">Success rate</div></div>
+      </section>
+
+      <h3 class="section-label" id="presets">Quick presets</h3>
+      <section class="presets">
+        <button class="preset" data-goal="Extract each job's title, company, location, salary, description and application link."><div class="p-ico">💼</div><b>Jobs</b><span>Roles &amp; applications</span></button>
+        <button class="preset" data-goal="Extract each internship's title, company, location, stipend, duration, deadline and application link."><div class="p-ico">🎓</div><b>Internships</b><span>Stipend &amp; deadlines</span></button>
+        <button class="preset" data-goal="Extract each hackathon's name, organizer, dates, location or mode, prize pool, theme and registration link."><div class="p-ico">🏆</div><b>Hackathons</b><span>Prizes &amp; dates</span></button>
+        <button class="preset" data-goal="Extract each scholarship's name, provider, eligibility, award amount, deadline and application link."><div class="p-ico">📚</div><b>Scholarships</b><span>Eligibility &amp; awards</span></button>
+        <button class="preset" data-goal="Extract each grant's title, funder, eligibility, funding amount, deadline and application link."><div class="p-ico">💰</div><b>Grants</b><span>Funding &amp; deadlines</span></button>
+        <button class="preset" data-goal="Extract each event's name, organizer, date, location, description and registration link."><div class="p-ico">🎟️</div><b>Events</b><span>Dates &amp; registration</span></button>
+      </section>
+
+      <h3 class="section-label" id="search">Search links</h3>
+      <form id="searchForm" class="panel form" novalidate>
+        <div class="field">
+          <label for="links">Links to search <small>one URL per line</small></label>
+          <textarea id="links" rows="5" placeholder="https://example.com/careers&#10;https://another.example/jobs"></textarea>
+        </div>
+
+        <div class="field">
+          <label for="goal">Information to collect</label>
+          <textarea id="goal" rows="3"></textarea>
+        </div>
+
+        <div class="form-row">
+          <div class="field">
+            <label for="limit">Maximum listings</label>
+            <div class="stepper">
+              <button type="button" id="minus" aria-label="Decrease">−</button>
+              <input id="limit" type="number" min="1" max="100" value="10" />
+              <button type="button" id="plus" aria-label="Increase">+</button>
+            </div>
+          </div>
+          <button id="submitBtn" type="submit" class="btn btn-teal btn-lg">
+            <span class="spinner" hidden></span>
+            <span class="label">Search links</span>
+          </button>
+        </div>
+
+        <div id="error" class="alert error" hidden></div>
+      </form>
+
+      <section id="progressCard" class="panel progress" hidden>
+        <h3><span class="dot"></span><span id="progressTitle">Searching supplied links…</span></h3>
+        <ul id="progressLog"></ul>
+      </section>
+
+      <details id="linksBox" class="panel links-box" hidden>
+        <summary>Links provided (<span id="linksCount">0</span>)</summary>
+        <div id="linksList" class="chips"></div>
+      </details>
+
+      <section id="results" class="results" hidden>
+        <div class="results-head">
+          <h3 class="section-label" id="resultsTitle">Results</h3>
+          <div class="results-tools">
+            <input id="filter" type="search" placeholder="Filter results…" />
+            <button id="downloadBtn" class="btn btn-ghost" type="button">⬇ Download JSON</button>
+          </div>
+        </div>
+        <div id="empty" class="alert info" hidden>
+          No listings were returned from the target pages. Try a broader search or revise the collection instructions.
+        </div>
+        <div class="table-wrap" id="tableWrap">
+          <table id="table"><thead></thead><tbody></tbody></table>
+        </div>
+      </section>
+
+      <div class="two-col" id="activity">
+        <section class="panel">
+          <h3 class="panel-title">Recent activity</h3>
+          <ul class="activity" id="activityList"><li class="muted">No activity yet — run your first search.</li></ul>
+        </section>
+        <section class="panel">
+          <h3 class="panel-title">Quick actions</h3>
+          <div class="actions">
+            <a href="#search" class="action">🔗 Add links</a>
+            <a href="#presets" class="action">✨ Pick a preset</a>
+            <button class="action" id="loadExample" type="button">🧪 Load example</button>
+          </div>
+        </section>
+      </div>
+
+      <footer>Built with TinyFish · Opportunity Finder</footer>
+    </main>
+  </div>
+  <script src="script.js"></script>
+</body>
+</html>
