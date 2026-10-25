@@ -513,7 +513,7 @@ def run(req: RunRequest):
                         events.put({"type": "pages", "pages": list(pages.values())})
                         goal_text = resume_utils.resume_goal(roles, skills, req.level, req.years, req.job_type, req.region)
                         schema = build_schema({**{k: {"type": "string"} for k in ("title", "organization", "location", "deadline", "apply_link", "category", "required_skills", "experience_required")},
-                                               "remote": {"type": "boolean"}}, "internships")
+                                               "remote": {"type": "boolean", "nullable": True}}, "internships", max_items=8)
                         rows = asyncio.run(_scrape_timed(pages, goal_text, "internships", schema, progress, partial))
                         rows = _dedupe([r for r in rows if r.get("title")], ("apply_link",))
                         rows = [resume_utils.score_listing(r, skills, roles, req.level) for r in rows]

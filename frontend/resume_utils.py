@@ -299,12 +299,15 @@ def build_queries(roles: list[str], skills: list[str], level: str, job_type: str
 
 def resume_goal(roles: list[str], skills: list[str], level: str, years: float, job_type: str, location: str) -> str:
     kind = {"internship": "internships", "job": "jobs", "both": "jobs and internships"}.get(job_type, "jobs")
+    # Keep this short and page-local: telling the agent to browse "reached from" the page made runs
+    # exceed PAGE_TIMEOUT, so every page was reported as skipped.
     return (
-        f"This page lists {kind}. Return up to 8 currently open positions on this page (or reached from it) that suit a candidate with "
-        f"{years:g} years of experience ({level} level) in: {', '.join(skills[:10]) or 'software'}; interested in: {', '.join(roles[:3])}"
-        f"{'; preferring ' + location if location else ''}. For each give title, organization, location, remote (true/false), deadline, "
-        "apply_link (the full URL to apply or view the opening), category, required_skills (comma-separated technologies the posting asks for), "
-        "and experience_required (for example '0-2 years'). Use an empty string for anything unavailable. Skip ads and expired postings."
+        f"Use only this page (do not browse to other sites or log in) and finish quickly. List up to 5 open {kind} shown on it, "
+        f"preferring ones that fit: {', '.join(roles[:3]) or 'software'}; skills: {', '.join(skills[:8]) or 'software'}; "
+        f"{level or 'entry'} level{'; ' + location if location else ''}. "
+        "For each give title, organization, location, remote (true/false), deadline, apply_link (full URL), category, "
+        "required_skills (comma-separated technologies) and experience_required (e.g. '0-2 years'). "
+        "Use an empty string for anything unavailable. If the page has no job listings, return an empty list."
     )
 
 
