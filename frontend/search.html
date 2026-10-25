@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Search Links · Opportunity Finder</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body data-page="search">
+  <div class="app">
+    <aside class="sidebar" id="sidebar"></aside>
+
+    <main class="main">
+      <button class="menu-btn" id="menuBtn" aria-label="Toggle menu">☰</button>
+
+      <section class="panel hero-panel compact">
+        <div>
+          <h1>Search links 🔗</h1>
+          <p class="hero-text">Provide the pages to search and the maximum number of listings to collect. TinyFish visits the links in order and stops once it reaches your limit.</p>
+        </div>
+        <span class="pill" id="statusPill">Ready</span>
+      </section>
+
+      <form id="searchForm" class="panel form" novalidate>
+        <div class="field">
+          <label for="links">Links to search <small>one URL per line</small></label>
+          <textarea id="links" rows="5" placeholder="https://example.com/careers&#10;https://another.example/jobs"></textarea>
+        </div>
+        <div class="field">
+          <label for="goal">Information to collect</label>
+          <textarea id="goal" rows="3"></textarea>
+        </div>
+        <div class="form-row">
+          <div class="field">
+            <label for="limit">Maximum listings</label>
+            <div class="stepper">
+              <button type="button" id="minus" aria-label="Decrease">−</button>
+              <input id="limit" type="number" min="1" max="100" value="10" />
+              <button type="button" id="plus" aria-label="Increase">+</button>
+            </div>
+          </div>
+          <button id="submitBtn" type="submit" class="btn btn-teal btn-lg">
+            <span class="spinner" hidden></span>
+            <span class="label">Search links</span>
+          </button>
+        </div>
+        <div id="error" class="alert error" hidden></div>
+      </form>
+
+      <section id="progressCard" class="panel progress" hidden>
+        <h3><span class="dot"></span><span id="progressTitle">Working…</span></h3>
+        <ul id="progressLog"></ul>
+        <a href="results.html" class="btn btn-teal view-results" id="viewResults" hidden>View results →</a>
+      </section>
+
+      <footer>Built with TinyFish · Opportunity Finder</footer>
+    </main>
+  </div>
+  <script src="shared.js"></script>
+  <script src="runner.js"></script>
+</body>
+</html>

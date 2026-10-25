@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Saved Sources · Opportunity Finder</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body data-page="sources">
+  <div class="app">
+    <aside class="sidebar" id="sidebar"></aside>
+
+    <main class="main">
+      <button class="menu-btn" id="menuBtn" aria-label="Toggle menu">☰</button>
+
+      <section class="panel hero-panel compact">
+        <div>
+          <h1>Saved sources 🏢</h1>
+          <p class="hero-text">Scrape every source configured in your backend, all at once, and collect the listings.</p>
+        </div>
+        <span class="pill" id="statusPill">Ready</span>
+      </section>
+
+      <section class="panel">
+        <h3 class="panel-title">Configured sources (<span id="sourcesCount">0</span>)</h3>
+        <div class="chips" id="sourcesList"></div>
+      </section>
+
+      <form id="searchForm" class="panel form" novalidate>
+        <div class="field">
+          <label for="goal">Information to collect</label>
+          <textarea id="goal" rows="3"></textarea>
+        </div>
+        <div class="field">
+          <label for="collection">Collection key <small>name of the list TinyFish returns</small></label>
+          <input id="collection" type="text" value="internships" />
+        </div>
+        <div class="form-row">
+          <span></span>
+          <button id="submitBtn" type="submit" class="btn btn-teal btn-lg">
+            <span class="spinner" hidden></span>
+            <span class="label">Scrape all sources</span>
+          </button>
+        </div>
+        <div id="error" class="alert error" hidden></div>
+      </form>
+
+      <section id="progressCard" class="panel progress" hidden>
+        <h3><span class="dot"></span><span id="progressTitle">Working…</span></h3>
+        <ul id="progressLog"></ul>
+        <a href="results.html" class="btn btn-teal view-results" id="viewResults" hidden>View results →</a>
+      </section>
+
+      <footer>Built with TinyFish · Opportunity Finder</footer>
+    </main>
+  </div>
+  <script src="shared.js"></script>
+  <script src="runner.js"></script>
+</body>
+</html>

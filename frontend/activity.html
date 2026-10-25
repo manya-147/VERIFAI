@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Activity · Opportunity Finder</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body data-page="activity">
+  <div class="app">
+    <aside class="sidebar" id="sidebar"></aside>
+
+    <main class="main">
+      <button class="menu-btn" id="menuBtn" aria-label="Toggle menu">☰</button>
+
+      <section class="panel hero-panel compact">
+        <div>
+          <h1>Recent activity ⚡</h1>
+          <p class="hero-text">Your saved runs — load one to reopen its results, or delete it.</p>
+        </div>
+        <button class="btn btn-ghost" id="clearBtn" type="button">🧹 Clear history</button>
+      </section>
+
+      <section class="panel">
+        <div class="saved-head"><h3 class="panel-title">Saved runs</h3><span class="pill" id="runsCount">0 saved</span></div>
+        <ul class="activity runs" id="runsList"></ul>
+      </section>
+
+      <footer>Built with TinyFish · Opportunity Finder</footer>
+    </main>
+  </div>
+  <script src="shared.js"></script>
+  <script src="activity.js"></script>
+</body>
+</html>

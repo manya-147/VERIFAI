@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Results · Opportunity Finder</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body data-page="results">
+  <div class="app">
+    <aside class="sidebar" id="sidebar"></aside>
+
+    <main class="main">
+      <button class="menu-btn" id="menuBtn" aria-label="Toggle menu">☰</button>
+
+      <section class="panel hero-panel compact">
+        <div>
+          <h1>Results</h1>
+          <p class="hero-text"><span id="resultsSub">Listings collected from your latest run.</span></p>
+        </div>
+        <a href="search.html" class="btn btn-teal">+ New Search</a>
+      </section>
+
+      <section id="noSearch" class="panel empty-state" hidden>
+        <div class="empty-ico">🔎</div>
+        <h3>Nothing collected yet</h3>
+        <p>Run a search and your results will appear here.</p>
+        <a href="search.html" class="btn btn-teal">Search links</a>
+      </section>
+
+      <details id="linksBox" class="panel links-box" hidden>
+        <summary>Pages visited (<span id="linksCount">0</span>)</summary>
+        <div id="linksList" class="chips"></div>
+      </details>
+
+      <section id="rawBox" class="panel" hidden>
+        <div class="results-head">
+          <h3 class="panel-title" id="rawTitle">Result</h3>
+          <button id="rawDownload" class="btn btn-ghost" type="button">⬇ Download JSON</button>
+        </div>
+        <pre class="json" id="rawJson"></pre>
+      </section>
+
+      <section id="results" class="results" hidden>
+        <div class="results-head">
+          <h3 class="section-label" id="resultsTitle">Results</h3>
+          <div class="results-tools">
+            <input id="filter" type="search" placeholder="Filter results…" />
+            <button id="downloadBtn" class="btn btn-ghost" type="button">⬇ Download JSON</button>
+          </div>
+        </div>
+        <div id="empty" class="alert info" hidden>
+          No listings were returned from the target pages. Try a broader search or revise the collection instructions.
+        </div>
+        <div class="table-wrap" id="tableWrap">
+          <table id="table"><thead></thead><tbody></tbody></table>
+        </div>
+      </section>
+
+      <footer>Built with TinyFish · Opportunity Finder</footer>
+    </main>
+  </div>
+  <script src="shared.js"></script>
+  <script src="results.js"></script>
+</body>
+</html>

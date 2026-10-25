@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dashboard · VERIFAI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body data-page="dashboard">
+  <div class="app">
+    <aside class="sidebar" id="sidebar"></aside>
+
+    <main class="main">
+      <button class="menu-btn" id="menuBtn" aria-label="Toggle menu">☰</button>
+
+      <section class="panel hero-panel">
+        <div>
+          <h1>VERIFAI </h1>
+          <p class="hero-text">Collect internships, jobs and other listings from any web page with TinyFish. Pick a way to collect below, then review everything on the Results page.</p>
+        </div>
+        <a href="search.html" class="btn btn-teal btn-lg">+ New Search</a>
+      </section>
+
+      <section class="stats">
+        <div class="stat"><div class="stat-ico">🔍</div><div class="stat-num" id="statSearches">0</div><div class="stat-label">Searches</div></div>
+        <div class="stat"><div class="stat-ico">📋</div><div class="stat-num" id="statListings">0</div><div class="stat-label">Listings found</div></div>
+        <div class="stat"><div class="stat-ico">🔗</div><div class="stat-num" id="statLinks">0</div><div class="stat-label">Pages visited</div></div>
+        <div class="stat"><div class="stat-ico">✅</div><div class="stat-num" id="statRate">—</div><div class="stat-label">Success rate</div></div>
+      </section>
+
+      <div class="two-col">
+        <section class="panel">
+          <h3 class="panel-title">Recent activity</h3>
+          <ul class="activity" id="activityList"></ul>
+          <p style="margin-top:14px"><a href="activity.html" class="btn btn-ghost">View all activity</a></p>
+        </section>
+
+        <section class="panel">
+          <h3 class="panel-title">Quick actions</h3>
+          <div class="actions">
+            <a class="action" href="search.html"> Search links</a>
+            <a class="action" href="single.html"> Scrape a single page</a>
+            <a class="action" href="sources.html"> Scrape saved sources</a>
+            <a class="action" href="discover.html"> Find &amp; scrape</a>
+            <a class="action" href="resume.html"> Match jobs to my resume</a>
+            <a class="action" href="results.html"> Latest results</a>
+          </div>
+        </section>
+      </div>
+
+      <footer>Built with TinyFish · Opportunity Finder</footer>
+    </main>
+  </div>
+  <script src="shared.js"></script>
+  <script src="dashboard.js"></script>
+</body>
+</html>
