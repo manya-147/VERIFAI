@@ -7,7 +7,8 @@
 
 const PAGE = document.body.dataset.page;
 const MODE = { search: "links", single: "single", sources: "sources", discover: "discover" }[PAGE];
-const FIELDS = ["links", "url", "query", "goal", "collection", "limit", "category", "region"].filter((id) => $(id));
+const FIELDS = ["links", "url", "query", "goal", "collection", "limit", "category", "region",
+  "includeDomains", "excludeDomains", "afterDate", "beforeDate", "recency", "searchType", "language"].filter((id) => $(id));
 let config = {};
 
 function showError(msg) { $("error").textContent = msg; $("error").hidden = !msg; }
@@ -26,44 +27,6 @@ function log(msg) {
   $("progressLog").appendChild(li);
 }
 
-async function run(payload, onProgress, onPages, signal, onPartial) {
-  const res = await fetch("/api/run", {
-    method: "POST",
-    signal,
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  if (!res.ok) {
-    let detail = res.statusText;
-    try { detail = (await res.json()).detail || detail; } catch {}
-    throw new Error(detail);
-  }
-
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "", result = null;
-  const handle = (line) => {
-    if (!line.trim()) return;
-    const msg = JSON.parse(line);
-    if (msg.type === "progress") onProgress(msg.message);
-    else if (msg.type === "pages") onPages(msg.pages);
-    else if (msg.type === "partial") onPartial && onPartial(msg.listings || []);
-    else if (msg.type === "result") result = msg;
-    else if (msg.type === "error") throw new Error(msg.message);
-  };
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split("\n");
-    buffer = lines.pop();
-    lines.forEach(handle);
-  }
-  handle(buffer);
-  if (!result) throw new Error("The server closed the connection before returning results.");
-  return result;
-}
-
 function readForm() {
   const value = (id) => ($(id) ? $(id).value : "");
   return {
@@ -75,6 +38,13 @@ function readForm() {
     collection: value("collection").trim(),
     category: value("category") || "auto",
     region: value("region").trim(),
+    include_domains: value("includeDomains").trim(),
+    exclude_domains: value("excludeDomains").trim(),
+    after_date: value("afterDate"),
+    before_date: value("beforeDate"),
+    recency_minutes: parseInt(value("recency"), 10) || null,
+    domain_type: value("searchType"),
+    language: value("language").trim(),
     limit: Math.min(100, Math.max(1, parseInt(value("limit"), 10) || 1)),
   };
 }
@@ -86,7 +56,11 @@ function validate(p) {
   } else if (MODE === "single") {
     if (!p.url) return "Enter a URL to scrape.";
     if (!isValidUrl(p.url)) return "The link must be a complete URL beginning with http:// or https://.";
-  } else if (MODE === "discover" && !p.query) return "Enter a search query.";
+  } else if (MODE === "discover") {
+    if (!p.query) return "Enter a search query.";
+    if (p.after_date && p.before_date && p.after_date > p.before_date) return "“Published after” must be earlier than “Published before”.";
+    if (p.recency_minutes != null && (p.recency_minutes < 1 || p.recency_minutes > 5256000)) return "Recency must be between 1 and 5256000 minutes.";
+  }
   return "";
 }
 
@@ -134,12 +108,14 @@ $("searchForm").addEventListener("submit", async (e) => {
       store.completed = !!result.completed;
       summary = result.completed ? "Single page scraped" : "Single page run did not complete";
       record(summary, { ok: !!result.completed, links: 1 });
+      saveRun({ mode: MODE, text: summary, ok: !!result.completed, query: payload.url, pages, raw: store.raw, results: null, completed: store.completed, limit: payload.limit, form: store.form[PAGE] });
     } else {
       store.raw = undefined;
       store.results = result.listings || [];
       store.note = result.note || "";
       summary = `${WHAT[MODE]} completed — ${store.results.length} listings from ${pages.length} page${pages.length === 1 ? "" : "s"}`;
       record(summary, { ok: true, listings: store.results.length, links: pages.length });
+      saveRun({ mode: MODE, text: summary, ok: true, query: payload.query || payload.links[0] || "", pages, results: store.results, limit: payload.limit, note: store.note, form: store.form[PAGE] });
     }
     saveStore();
 
@@ -157,7 +133,9 @@ $("searchForm").addEventListener("submit", async (e) => {
       store.raw = undefined;
       store.results = partial.slice(0, payload.limit);
       store.note = "Partial results: the run was cut off before every page finished.";
-      record(`${WHAT[MODE]} partial — ${store.results.length} listings`, { ok: true, listings: store.results.length, links: pages.length });
+      const text = `${WHAT[MODE]} partial — ${store.results.length} listings`;
+      record(text, { ok: true, listings: store.results.length, links: pages.length });
+      saveRun({ mode: MODE, text, ok: true, query: payload.query || payload.links[0] || "", pages, results: store.results, limit: payload.limit, note: store.note, form: store.form[PAGE] });
       saveStore();
       $("progressCard").classList.add("done");
       $("progressTitle").textContent = "Partial results";
@@ -168,7 +146,9 @@ $("searchForm").addEventListener("submit", async (e) => {
     $("progressCard").hidden = true;
     const msg = err.name === "AbortError" ? "It took longer than 8 minutes, so it was stopped. Try fewer pages or a more specific search." : err.message;
     showError(`Could not complete the search: ${msg}`);
-    record(`${WHAT[MODE]} failed — ${err.message}`, { ok: false });
+    const failText = `${WHAT[MODE]} failed — ${err.message}`;
+    record(failText, { ok: false });
+    saveRun({ mode: MODE, text: failText, ok: false, query: payload.query || payload.url || payload.links[0] || "" });
   } finally {
     clearInterval(ticker);
     clearTimeout(cutoff);
@@ -185,6 +165,7 @@ if ($("limit")) {
 // Restore what was last used on this page, otherwise take defaults from the backend.
 const saved = store.form[PAGE] || {};
 FIELDS.forEach((id) => { if (saved[id] != null) $(id).value = saved[id]; });
+if ($("advanced") && ["includeDomains", "excludeDomains", "afterDate", "beforeDate", "recency", "searchType", "language"].some((id) => $(id).value)) $("advanced").open = true;
 
 fetch("/api/config")
   .then((r) => r.json())

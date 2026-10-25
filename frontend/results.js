@@ -21,9 +21,16 @@ function renderLinks(links) {
   $("linksBox").hidden = false;
 }
 
-function cell(value) {
+function cell(value, column) {
   const td = document.createElement("td");
   if (value == null) return td;
+  if (column === "match_score") {
+    const b = document.createElement("span");
+    b.className = "score " + (value >= 70 ? "hi" : value >= 40 ? "mid" : "lo");
+    b.textContent = value + "%";
+    td.appendChild(b);
+    return td;
+  }
   if (typeof value === "string" && isValidUrl(value)) {
     const a = document.createElement("a");
     a.href = value; a.target = "_blank"; a.rel = "noopener noreferrer"; a.textContent = value;
@@ -33,17 +40,22 @@ function cell(value) {
   return td;
 }
 
+const WIDE = ["title", "product_name", "required_skills", "matched_skills", "missing_skills", "summary"];
+
 function drawTable(list) {
-  const columns = [...new Set(rows.flatMap((r) => Object.keys(r)))];
+  // Most useful columns first; "source" (the page it came from) last.
+  const FIRST = ["match_score", "title", "product_name", "organization", "store", "location", "remote", "apply_link", "link", "product_link", "price", "date", "deadline", "matched_skills", "missing_skills", "experience_required", "category", "required_skills"];
+  const all = [...new Set(rows.flatMap((r) => Object.keys(r)))];
+  const columns = [...FIRST.filter((c) => all.includes(c)), ...all.filter((c) => !FIRST.includes(c) && c !== "source"), ...all.filter((c) => c === "source")];
   const thead = $("table").querySelector("thead");
   const tbody = $("table").querySelector("tbody");
   thead.innerHTML = ""; tbody.innerHTML = "";
   const head = document.createElement("tr");
-  columns.forEach((c) => { const th = document.createElement("th"); th.textContent = c.replace(/_/g, " "); head.appendChild(th); });
+  columns.forEach((c) => { const th = document.createElement("th"); if (WIDE.includes(c)) th.style.minWidth = "220px"; th.textContent = c.replace(/_/g, " "); head.appendChild(th); });
   thead.appendChild(head);
   list.forEach((row) => {
     const tr = document.createElement("tr");
-    columns.forEach((c) => tr.appendChild(cell(row[c])));
+    columns.forEach((c) => { const td = cell(row[c], c); if (WIDE.includes(c)) td.style.minWidth = "220px"; tr.appendChild(td); });
     tbody.appendChild(tr);
   });
 }

@@ -49,12 +49,55 @@
           <label for="goal">Extra instructions <small>optional — leave empty for the default for this type</small></label>
           <textarea id="goal" rows="2" placeholder="e.g. only 256GB, only brand-new, only from official stores"></textarea>
         </div>
+        <details class="advanced" id="advanced">
+          <summary>⚙ Advanced search filters <small>optional</small></summary>
+          <div class="advanced-body">
+            <div class="form-row two">
+              <div class="field">
+                <label for="includeDomains">Only these domains <small>comma-separated</small></label>
+                <input id="includeDomains" type="text" placeholder="e.g. github.com,arxiv.org" />
+              </div>
+              <div class="field">
+                <label for="excludeDomains">Exclude these domains <small>comma-separated</small></label>
+                <input id="excludeDomains" type="text" placeholder="e.g. pinterest.com,quora.com" />
+              </div>
+            </div>
+            <div class="form-row two">
+              <div class="field">
+                <label for="afterDate">Published after <small>YYYY-MM-DD</small></label>
+                <input id="afterDate" type="date" />
+              </div>
+              <div class="field">
+                <label for="beforeDate">Published before <small>YYYY-MM-DD</small></label>
+                <input id="beforeDate" type="date" />
+              </div>
+            </div>
+            <div class="form-row two">
+              <div class="field">
+                <label for="recency">Recency <small>minutes (e.g. 1440 = last 24h)</small></label>
+                <input id="recency" type="number" min="1" max="5256000" placeholder="leave empty for no limit" />
+              </div>
+              <div class="field">
+                <label for="searchType">Search type</label>
+                <select id="searchType">
+                  <option value="" selected>Any (web)</option>
+                  <option value="news">News</option>
+                  <option value="research_paper">Research papers</option>
+                </select>
+              </div>
+            </div>
+            <div class="field">
+              <label for="language">Language <small>code, e.g. en, hi, fr</small></label>
+              <input id="language" type="text" placeholder="e.g. en" />
+            </div>
+          </div>
+        </details>
         <div class="form-row">
           <div class="field">
             <label for="limit">Number of web pages to scrape</label>
             <div class="stepper">
               <button type="button" id="minus" aria-label="Decrease">−</button>
-              <input id="limit" type="number" min="1" max="100" value="10" />
+              <input id="limit" type="number" min="1" max="100" value="5" />
               <button type="button" id="plus" aria-label="Increase">+</button>
             </div>
           </div>

@@ -16,6 +16,7 @@ from urllib.parse import urlparse
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
 sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(HERE))
 
 try:  # the Streamlit app expected TINYFISH_API_KEY in the environment or a .env file
     from dotenv import load_dotenv
@@ -33,6 +34,7 @@ from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel
 from tinyfish import AsyncTinyFish, RunStatus, TinyFish
 
+import resume_utils
 from backend.backend import collect_from_pages
 from backend.models import (
     DEFAULT_GOAL,
@@ -64,6 +66,42 @@ class RunRequest(BaseModel):
     limit: int = 10
     category: str = "auto"         # discover   -> auto | shopping | jobs | events | general
     region: str = ""               # discover   -> optional country / city / market
+    # discover -> advanced TinyFish().search.query filters (all optional)
+    include_domains: str = ""
+    exclude_domains: str = ""
+    after_date: str = ""
+    before_date: str = ""
+    recency_minutes: int | None = None
+    domain_type: str = ""          # "" (web) | news | research_paper
+    language: str = ""
+    # resume -> profile used to build searches and to rank the jobs found
+    roles: list[str] = []
+    skills: list[str] = []
+    years: float = 0
+    level: str = ""                # intern | entry | junior | mid | senior
+    job_type: str = "both"         # internship | job | both
+
+
+class ResumeParseRequest(BaseModel):
+    text: str = ""                 # pasted resume text
+    pdf_b64: str = ""              # uploaded PDF, base64 (a data: URL prefix is fine)
+
+
+def _search_filters(req: "RunRequest") -> dict:
+    """Optional search.query() arguments; anything left empty is simply not sent."""
+    clean = lambda csv: ",".join(p.strip() for p in csv.split(",") if p.strip())  # noqa: E731
+    filters = {
+        "include_domains": clean(req.include_domains),
+        "exclude_domains": clean(req.exclude_domains),
+        "after_date": req.after_date.strip(),
+        "before_date": req.before_date.strip(),
+        "language": req.language.strip(),
+        "domain_type": req.domain_type.strip() if req.domain_type in ("news", "research_paper") else "",
+    }
+    filters = {k: v for k, v in filters.items() if v}
+    if req.recency_minutes:
+        filters["recency_minutes"] = max(1, min(5256000, int(req.recency_minutes)))
+    return filters
 
 
 def _is_valid_url(url: str) -> bool:
@@ -110,8 +148,32 @@ RUN_TIMEOUT = int(os.getenv("RUN_TIMEOUT", "420"))     # then slow pages are ski
 CONCURRENCY = int(os.getenv("CONCURRENCY", "5"))       # pages scraped at the same time (5 = the default search limit, so one wave)
 
 
+def _find_items(result, collection: str) -> list[dict]:
+    """extract_items() first; if the agent used a different key, fall back to the first list of objects it returned."""
+    items = extract_items(result, collection)
+    if items or not isinstance(result, dict):
+        return items
+
+    def walk(node, depth=0):
+        if isinstance(node, list) and node and all(isinstance(x, dict) for x in node):
+            return node
+        if isinstance(node, dict) and depth < 3:
+            for value in node.values():
+                found = walk(value, depth + 1)
+                if found:
+                    return found
+        return None
+
+    return walk(result) or []
+
+
+# Why pages produced nothing (shown on the Results page when a run comes back empty).
+_DIAG: list[str] = []
+
+
 async def _scrape_timed(pages: dict[str, str], goal: str, collection: str, schema: dict | None, progress, on_partial=None) -> list[dict]:
     """Same job as backend.models.scrape(), but with time limits and live per-page progress."""
+    _DIAG.clear()
     client = AsyncTinyFish(timeout=PAGE_TIMEOUT, max_retries=0)
     output_schema = schema or build_schema(collection_key=collection)
     gate = asyncio.Semaphore(CONCURRENCY)
@@ -126,17 +188,24 @@ async def _scrape_timed(pages: dict[str, str], goal: str, collection: str, schem
                     client.agent.run(url=url, goal=goal, output_schema=output_schema), PAGE_TIMEOUT)
             except asyncio.TimeoutError:
                 finished += 1
+                _DIAG.append(f"{source}: no answer within {PAGE_TIMEOUT}s")
                 progress(f"[{finished}/{total}] Skipped {source} — no answer within {PAGE_TIMEOUT}s")
                 return
             except Exception as error:  # noqa: BLE001
                 finished += 1
-                progress(f"[{finished}/{total}] Skipped {source} — {error}")
+                _DIAG.append(f"{source}: {error.__class__.__name__}: {error}")
+                progress(f"[{finished}/{total}] Skipped {source} — {error.__class__.__name__}: {error}")
                 return
             finished += 1
             if run.status != RunStatus.COMPLETED:
-                progress(f"[{finished}/{total}] Skipped {source} — run ended as {run.status}")
+                reason = getattr(getattr(run, "error", None), "message", "") or ""
+                _DIAG.append(f"{source}: run ended as {run.status}{' — ' + reason if reason else ''}")
+                progress(f"[{finished}/{total}] Skipped {source} — run ended as {run.status} {reason}".strip())
                 return
-            items = extract_items(run.result, collection)
+            items = _find_items(run.result, collection)
+            if not items:
+                keys = list(run.result) if isinstance(run.result, dict) else type(run.result).__name__
+                _DIAG.append(f"{source}: page scraped but nothing matched (result: {keys})")
             batch = [{"source": source, **item} for item in items]
             listings.extend(batch)
             progress(f"[{finished}/{total}] {source} — {len(items)} found")
@@ -320,6 +389,28 @@ def _discover_plan(req: "RunRequest") -> dict:
     }
 
 
+@app.post("/api/resume/parse")
+def parse_resume(req: ResumeParseRequest):
+    """Pasted text or an uploaded PDF -> editable profile (skills, experience, level, target roles, ...)."""
+    text = req.text
+    try:
+        if req.pdf_b64:
+            import base64
+            raw = req.pdf_b64.split(",", 1)[-1]
+            data = base64.b64decode(raw, validate=False)
+            if len(data) > 10 * 1024 * 1024:
+                return _error("That PDF is larger than 10 MB.")
+            text = resume_utils.extract_pdf_text(data)
+        if len(text.strip()) < 40:
+            return _error("The resume is too short to analyse. Paste the full text or upload a PDF.")
+        profile = resume_utils.analyze_resume(text[:60000])
+    except RuntimeError as error:
+        return _error(str(error))
+    if not profile["skills"]:
+        profile["warning"] = "No known technologies were found — add your skills below before searching."
+    return {"profile": profile, "text": text[:60000]}
+
+
 @app.get("/api/config")
 def config():
     return {
@@ -355,6 +446,14 @@ def run(req: RunRequest):
     elif mode == "discover":
         if not req.query.strip():
             return _error("Enter a search query.")
+        date_re = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+        if any(d and not date_re.match(d) for d in (req.after_date, req.before_date)):
+            return _error("Dates must be in YYYY-MM-DD format.")
+        if req.after_date and req.before_date and req.after_date > req.before_date:
+            return _error("“Published after” must be earlier than “Published before”.")
+    elif mode == "resume":
+        if not (req.skills or req.roles):
+            return _error("Add your resume first — there are no skills or target roles to search with.")
     elif mode != "sources":
         return _error(f"Unknown mode: {mode}")
     if not os.getenv("TINYFISH_API_KEY"):
@@ -385,15 +484,55 @@ def run(req: RunRequest):
                     events.put({"type": "result", "raw": raw, "completed": raw is not None})
                 elif mode == "sources":    # backend mode 2: scrape configured PAGES
                     progress(f"Scraping {len(PAGES)} saved sources…")
-                    events.put({"type": "result", "listings": scrape_pages(PAGES)})
+                    rows = scrape_pages(PAGES)
+                    events.put({"type": "result", "listings": rows,
+                                "note": "" if rows or not _DIAG else "No listings found. " + " | ".join(_DIAG[:6])})
+                elif mode == "resume":     # resume -> search queries -> TinyFish search -> scrape -> rank by fit
+                    roles = [r.strip() for r in req.roles if r.strip()]
+                    skills = [x.strip() for x in req.skills if x.strip()]
+                    queries = resume_utils.build_queries(roles, skills, req.level, req.job_type, req.region)
+                    filters = _search_filters(req)
+                    per_query: list[list[str]] = []
+                    for q in queries:
+                        progress(f"Searching the web for: {q}")
+                        try:
+                            found = TinyFish().search.query(query=q, **filters)
+                            per_query.append([r.url for r in found.results])
+                        except Exception as error:  # noqa: BLE001
+                            progress(f"Search failed for “{q}”: {error.__class__.__name__}: {error}")
+                    urls: list[str] = []
+                    for rank in range(max((len(u) for u in per_query), default=0)):   # round-robin so every role gets pages
+                        for urls_for_q in per_query:
+                            if rank < len(urls_for_q) and urls_for_q[rank] not in urls:
+                                urls.append(urls_for_q[rank])
+                    pages = {u: u for u in urls[:limit]}
+                    if not pages:
+                        events.put({"type": "result", "listings": [], "note": "The web search returned no pages" + (" — try loosening the filters." if filters else ".")})
+                    else:
+                        progress(f"Found {len(pages)} pages. Scraping up to {CONCURRENCY} at a time (max {PAGE_TIMEOUT}s each)…")
+                        events.put({"type": "pages", "pages": list(pages.values())})
+                        goal_text = resume_utils.resume_goal(roles, skills, req.level, req.years, req.job_type, req.region)
+                        schema = build_schema({**{k: {"type": "string"} for k in ("title", "organization", "location", "deadline", "apply_link", "category", "required_skills", "experience_required")},
+                                               "remote": {"type": "boolean"}}, "internships")
+                        rows = asyncio.run(_scrape_timed(pages, goal_text, "internships", schema, progress, partial))
+                        rows = _dedupe([r for r in rows if r.get("title")], ("apply_link",))
+                        rows = [resume_utils.score_listing(r, skills, roles, req.level) for r in rows]
+                        rows.sort(key=lambda r: (-r["match_score"], r.get("remote") is not True))
+                        note = "ranked by how well each fits your resume"
+                        if not rows and _DIAG:
+                            note = "No listings found. " + " | ".join(_DIAG[:6])
+                        events.put({"type": "result", "listings": rows, "note": note})
                 else:                      # backend mode 3, generalised: search anything, then scrape the top pages
                     plan = _discover_plan(req)
                     progress(f"Searching the web for: {req.query.strip()} ({plan['category']})")
-                    found = TinyFish().search.query(query=plan["search"])
+                    filters = _search_filters(req)
+                    if filters:
+                        progress("Search filters: " + ", ".join(f"{k}={v}" for k, v in filters.items()))
+                    found = TinyFish().search.query(query=plan["search"], **filters)
                     pages = {r.url: r.url for r in found.results[: max(limit, 0)]}
                     if not pages:
                         progress("No pages found for that search.")
-                        events.put({"type": "result", "listings": [], "note": ""})
+                        events.put({"type": "result", "listings": [], "note": "The web search returned no pages" + (" — try loosening the filters." if filters else ".")})
                     else:
                         progress(f"Found {len(pages)} pages. Scraping up to {CONCURRENCY} at a time (max {PAGE_TIMEOUT}s each)…")
                         events.put({"type": "pages", "pages": list(pages.values())})
@@ -401,7 +540,10 @@ def run(req: RunRequest):
                             pages, plan["goal"], plan["collection"], plan["schema"], progress, partial,
                         ))
                         rows = plan["finish"](rows)
-                        events.put({"type": "result", "listings": rows, "note": plan["note"]})
+                        note = plan["note"]
+                        if not rows and _DIAG:
+                            note = "No listings found. " + " | ".join(_DIAG[:6])
+                        events.put({"type": "result", "listings": rows, "note": note})
         except BaseException as error:  # incl. SystemExit; shown as "Could not complete the search: ..."
             events.put({"type": "error", "message": str(error) or error.__class__.__name__})
         finally:
@@ -419,7 +561,7 @@ def run(req: RunRequest):
 # Only the frontend files below are served (never server.py or the backend).
 STATIC = {
     "index.html", "search.html", "single.html", "sources.html", "discover.html",
-    "results.html", "activity.html", "style.css",
+    "results.html", "activity.html", "resume.html", "resume.js", "style.css",
     "shared.js", "dashboard.js", "runner.js", "results.js", "activity.js",
 }
 

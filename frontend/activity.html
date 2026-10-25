@@ -19,13 +19,14 @@
       <section class="panel hero-panel compact">
         <div>
           <h1>Recent activity ⚡</h1>
-          <p class="hero-text">Everything you have run in this session.</p>
+          <p class="hero-text">Your saved runs — load one to reopen its results, or delete it.</p>
         </div>
         <button class="btn btn-ghost" id="clearBtn" type="button">🧹 Clear history</button>
       </section>
 
       <section class="panel">
-        <ul class="activity" id="activityList"></ul>
+        <div class="saved-head"><h3 class="panel-title">Saved runs</h3><span class="pill" id="runsCount">0 saved</span></div>
+        <ul class="activity runs" id="runsList"></ul>
       </section>
 
       <footer>Built with TinyFish · Opportunity Finder</footer>
